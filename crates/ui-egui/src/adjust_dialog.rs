@@ -92,13 +92,15 @@ fn curves_picker_controls(ui: &mut egui::Ui, fields: &mut Map<String, Value>, mo
     ui.horizontal(|ui| {
         let tokens = crate::theme::Tokens::get(ui.ctx());
         ui.label(egui::RichText::new(tl!("Eyedroppers:")).color(tokens.text_dim).size(12.0));
-        for (id, eyedropper, label, color) in [
-            ("black", CurvesEyedropper::Black, tl!("Set Black Point"), egui::Color32::BLACK),
-            ("gray", CurvesEyedropper::NeutralGray, tl!("Set Neutral Gray Point"), egui::Color32::from_gray(128)),
-            ("white", CurvesEyedropper::White, tl!("Set White Point"), egui::Color32::WHITE),
+        // The swatch is the tone the picker maps the sample to (image data, like the Curves
+        // gradient bars), not chrome, so it is the same in every theme; its ring is a token.
+        for (id, eyedropper, label, tone) in [
+            ("black", CurvesEyedropper::Black, tl!("Set Black Point"), 0),
+            ("gray", CurvesEyedropper::NeutralGray, tl!("Set Neutral Gray Point"), 128),
+            ("white", CurvesEyedropper::White, tl!("Set White Point"), 255),
         ] {
             let enabled = picker_supported(mode, eyedropper);
-            if picker_button(ui, current == Some(eyedropper), enabled, label, color).clicked() {
+            if picker_button(ui, current == Some(eyedropper), enabled, label, egui::Color32::from_gray(tone)).clicked() {
                 chosen = Some((id, eyedropper));
             }
         }

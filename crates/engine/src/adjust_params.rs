@@ -669,6 +669,50 @@ pub fn curves_eyedropper(base: &Value, picker: CurvesEyedropper, sample: [f32; 3
     Ok(adjustment)
 }
 
+/// The `eyedropper` param of the Curves commands, so agents and the CLI can drive the dialog's
+/// Set Black/Neutral Gray/White Point pickers: `{"point":"black"|"gray"|"white","at":[x,y]}`
+/// samples the merged composite at document pixel (x, y), or `"color":[r,g,b]` (0–1) gives the
+/// sample directly. The rest of `p` is the curve the picker edits. `None` without the key.
+pub fn curves_eyedropper_from_params(s: &crate::Session, p: &Value) -> Result<Option<Adjustment>> {
+    const CMD: &str = "curves eyedropper";
+    let Some(e) = p.get("eyedropper") else { return Ok(None) };
+    let picker = match e.get("point").and_then(Value::as_str) {
+        Some("black") => CurvesEyedropper::Black,
+        Some("gray") => CurvesEyedropper::NeutralGray,
+        Some("white") => CurvesEyedropper::White,
+        _ => return Err(bad(CMD, "`eyedropper.point` must be \"black\", \"gray\" or \"white\"")),
+    };
+    let d = s.active().ok_or(EngineError::NoDocument)?;
+    let triple = |v: &Value| -> Option<[f64; 3]> {
+        let a = v.as_array().filter(|a| a.len() == 3)?;
+        Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?, a.get(2)?.as_f64()?])
+    };
+    let sample = if let Some(c) = e.get("color") {
+        let c = triple(c).ok_or_else(|| bad(CMD, "`eyedropper.color` must be [r, g, b] in 0..1"))?;
+        c.map(|v| v as f32)
+    } else if let Some(at) = e.get("at") {
+        let xy = at.as_array().filter(|a| a.len() == 2).and_then(|a| Some([a.first()?.as_f64()?, a.get(1)?.as_f64()?]));
+        let [x, y] = xy.filter(|xy| xy.iter().all(|v| v.is_finite())).ok_or_else(|| bad(CMD, "`eyedropper.at` must be [x, y] in document pixels"))?;
+        let (w, h) = (f64::from(d.doc.size.width), f64::from(d.doc.size.height));
+        if x < 0.0 || y < 0.0 || x >= w || y >= h {
+            return Err(bad(CMD, "`eyedropper.at` is outside the image"));
+        }
+        let rect = photocraft_geom::Rect::from_xywh(x.floor() as i32, y.floor() as i32, 1, 1);
+        let [r, g, b, a] = photocraft_compose::render(&d.doc, rect).px.first().copied().unwrap_or_default();
+        if a <= 0.0 {
+            return Err(bad(CMD, "the sampled pixel is transparent"));
+        }
+        [r, g, b]
+    } else {
+        return Err(bad(CMD, "`eyedropper` needs `at` [x, y] or `color` [r, g, b]"));
+    };
+    let mut base = p.clone();
+    if let Some(o) = base.as_object_mut() {
+        o.remove("eyedropper");
+    }
+    curves_eyedropper(&base, picker, sample, d.doc.mode).map(Some)
+}
+
 /// `[[in, out], …]` in 0..255: sorted by input, duplicates collapsed, 2..=19 points.
 pub fn parse_curve(cmd: &str, key: &str, v: &Value) -> Result<Vec<CurvePoint>> {
     let err = || bad(cmd, format!("`{key}` must be an array of 2..={MAX_CURVE_POINTS} [input, output] pairs in 0..255"));
@@ -1090,6 +1134,31 @@ mod tests {
             let sample_pair = curve.windows(2).find(|pair| pair[0].input <= input && input <= pair[1].input).unwrap();
             assert!((sample_pair[0].output - sample_pair[1].output).abs() < 1e-6, "fallback forms a plateau around the sample: {curve:?}");
             assert!((sample_pair[0].output - target).abs() < 0.001, "fallback uses the luma target: {curve:?}");
+        }
+    }
+
+    #[test]
+    fn curves_eyedropper_param_drives_the_command() {
+        let mut s = crate::Session::new();
+        s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
+        s.execute("edit.fill", json!({"color": [0.6, 0.5, 0.4]})).unwrap();
+        s.execute("image.adjustments.curves", json!({"eyedropper": {"point": "white", "at": [2, 2]}})).unwrap();
+        let px: Vec<f32> = serde_json::from_value(s.execute("document.pixel", json!({"x": 2, "y": 2})).unwrap()).unwrap();
+        assert!(px.iter().take(3).all(|v| *v > 0.99), "the sample becomes white: {px:?}");
+        s.execute("image.adjustments.curves", json!({"eyedropper": {"point": "black", "color": [1.0, 1.0, 1.0]}})).unwrap();
+        let px: Vec<f32> = serde_json::from_value(s.execute("document.pixel", json!({"x": 2, "y": 2})).unwrap()).unwrap();
+        assert!(px.iter().take(3).all(|v| *v < 0.01), "the given colour becomes black: {px:?}");
+        for bad in [
+            json!("black"),
+            json!({"point": "nope", "at": [1, 1]}),
+            json!({"point": "black"}),
+            json!({"point": "black", "at": [99, 1]}),
+            json!({"point": "black", "at": [-1, 1]}),
+            json!({"point": "black", "at": [1]}),
+            json!({"point": "gray", "at": [f64::MAX, 1]}),
+            json!({"point": "black", "color": "red"}),
+        ] {
+            assert!(s.execute("image.adjustments.curves", json!({"eyedropper": bad})).is_err(), "{bad}");
         }
     }
 
