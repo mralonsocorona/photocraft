@@ -121,6 +121,7 @@ mod rgb_histogram;
 pub mod rotate_view;
 pub mod rulers;
 pub mod screen_picker;
+mod sampled_color_preview;
 pub mod scrollbars;
 pub mod served_fonts;
 pub mod shortcut_dispatch;
@@ -471,6 +472,8 @@ pub struct PhotocraftApp {
     pub(crate) clip_read_for_paste: bool,
     /// Pointer position over the canvas (document px), for the Info panel and status bar.
     pub(crate) hover_doc: Option<[f64; 2]>,
+    /// Cached, uncommitted Eyedropper hover sample.
+    pub(crate) sampled_color_preview: sampled_color_preview::Preview,
     pub(crate) clone_preview: Option<crate::canvas::ClonePreviewCache>,
     /// Info panel sample cache: ((x, y, revision, Sample Size), composite RGBA).
     info_sample: Option<(InfoSampleKey, [f32; 4])>,
