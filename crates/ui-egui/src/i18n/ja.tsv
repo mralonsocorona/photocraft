@@ -1865,6 +1865,7 @@
 	Show only crosshair while painting	描画中は十字線のみ表示
 	Show slice numbers	スライス番号を表示
 	Show tooltips	ツールチップを表示
+	Show Floating Color Preview	フローティングカラー プレビューを表示
 	Show bounding box when dragging layer	レイヤーのドラッグ中にバウンディングボックスを表示
 	System title bar	システムのタイトルバー
 	Show transformation values	変形値を表示

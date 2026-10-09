@@ -283,6 +283,7 @@ impl Default for Workspace {
 #[serde(default, rename_all = "camelCase")]
 pub struct Tools {
     pub show_tooltips: bool,
+    pub show_floating_color_preview: bool,
     /// Tool keys cycle a tool group only with ⇧ held (Photoshop's "Use Shift Key for Tool Switch").
     pub use_shift_key_for_tool_switch: bool,
     pub zoom_clicked_point_to_center: bool,
@@ -303,6 +304,7 @@ impl Default for Tools {
     fn default() -> Self {
         Self {
             show_tooltips: true,
+            show_floating_color_preview: false,
             use_shift_key_for_tool_switch: false,
             zoom_clicked_point_to_center: false,
             enable_flick_panning: true,

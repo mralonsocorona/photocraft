@@ -793,6 +793,9 @@ pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Valu
 }
 
 fn humanize(key: &str) -> String {
+    if key == "showFloatingColorPreview" {
+        return "Show Floating Color Preview".into();
+    }
     // These controls appear only for WebP, so reuse the existing translated labels.
     if key == "webpLossless" {
         return "Lossless".into();
@@ -1538,6 +1541,33 @@ mod tests {
         assert!(export_field_visible(&obj, "webpQuality"));
         assert_eq!(humanize("webpLossless"), "Lossless");
         assert_eq!(humanize("webpQuality"), "Quality");
+    }
+
+    #[test]
+    fn floating_color_preview_is_a_visible_tools_preference() {
+        fn collect(shape: &egui::Shape, text: &mut Vec<String>) {
+            match shape {
+                egui::Shape::Text(shape) => text.push(shape.galley.job.text.clone()),
+                egui::Shape::Vec(shapes) => shapes.iter().for_each(|shape| collect(shape, text)),
+                _ => {}
+            }
+        }
+
+        let values = prefs::Preferences::default().to_json();
+        assert_eq!(values["tools"]["showFloatingColorPreview"], false);
+        assert!(!prefs::is_hidden("tools.showFloatingColorPreview"));
+        assert!(has_visible_fields(&values, "tools"));
+        assert_eq!(humanize("showFloatingColorPreview"), "Show Floating Color Preview");
+
+        let mut tools = values["tools"].as_object().unwrap().clone();
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(Default::default(), |ui| section_fields(ui, "tools", &mut tools, &[], crate::i18n::Lang::EN));
+        let mut text = Vec::new();
+        for shape in &output.shapes {
+            collect(&shape.shape, &mut text);
+        }
+        assert!(text.iter().any(|label| label == "Show Floating Color Preview"), "generic Tools editor labels: {text:?}");
+        output.textures_delta.clear();
     }
 
     #[test]

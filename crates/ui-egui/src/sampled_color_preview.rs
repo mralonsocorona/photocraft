@@ -62,6 +62,11 @@ pub(crate) fn sample(app: &mut PhotocraftApp, document: &Arc<Document>, revision
     rgb
 }
 
+fn readouts(rgb: [f32; 3]) -> (String, String) {
+    let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+    (crate::color_picker_ui::hex(rgb), format!("{}, {}, {}", byte(rgb[0]), byte(rgb[1]), byte(rgb[2])))
+}
+
 /// Convert a document-space point to an addressable pixel without casting hostile coordinates.
 fn pixel_at(point: [f64; 2], size: [u32; 2]) -> Option<[i32; 2]> {
     if !(point[0].is_finite() && point[1].is_finite()) {
@@ -100,9 +105,8 @@ fn placement(pixel: egui::Rect, bounds: egui::Rect) -> (Pos2, egui::Align2) {
 /// pixel, constrained to the canvas.
 pub(crate) fn draw(ctx: &egui::Context, pixel: egui::Rect, bounds: egui::Rect, rgb: [f32; 3]) -> egui::Rect {
     let t = Tokens::get(ctx);
-    let hex = crate::color_picker_ui::hex(rgb);
     let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
-    let rgb_text = format!("{}, {}, {}", byte(rgb[0]), byte(rgb[1]), byte(rgb[2]));
+    let (hex, rgb_text) = readouts(rgb);
     let swatch = Color32::from_rgb(byte(rgb[0]), byte(rgb[1]), byte(rgb[2]));
     let (pos, anchor) = placement(pixel, bounds);
 
@@ -210,6 +214,7 @@ mod tests {
             assert!((rgb[1] - 0x66 as f32 / 255.0).abs() < 0.01, "depth {depth}: {rgb:?}");
             assert!((rgb[2] - 0x99 as f32 / 255.0).abs() < 0.01, "depth {depth}: {rgb:?}");
             assert_eq!(crate::color_picker_ui::hex(rgb), "#336699");
+            assert_eq!(readouts(rgb), ("#336699".into(), "51, 102, 153".into()));
         }
     }
 
@@ -275,6 +280,11 @@ mod tests {
         use egui::{Event, PointerButton, pos2};
         use egui_kittest::Harness;
 
+        fn preview_area_visible(h: &Harness<'_, PhotocraftApp>) -> bool {
+            let layer = egui::LayerId::new(egui::Order::Tooltip, egui::Id::new("sampled-color-preview"));
+            h.ctx.memory(|memory| memory.areas().is_visible(&layer))
+        }
+
         let mut app = app();
         app.ui.tool = Tool::Eyedropper;
         app.ui.views = vec![View { zoom: 1.0, center: [20.0, 10.0], fit_pending: false, doc_size: [40, 20] }];
@@ -297,7 +307,9 @@ mod tests {
         let button = |pos, pressed| Event::PointerButton { pos, button: PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
         h.event(Event::PointerMoved(red));
         h.step();
-        assert_eq!(h.state().sampled_color_preview.rgb, Some([1.0, 0.0, 0.0]), "real canvas hover samples the image");
+        assert_eq!(h.state().sampled_color_preview.key, None, "disabled preview does not perform an extra hover sample");
+        assert!(h.state().sampled_color_preview.rgb.is_none());
+        assert!(!preview_area_visible(&h), "disabled preview draws no floating area");
 
         h.event(button(red, true));
         h.step();
@@ -307,7 +319,13 @@ mod tests {
         assert_eq!(h.state().sampled_color_preview.key, None, "no hover readout is drawn while sampling by drag");
         h.event(button(green, false));
         h.step();
-        assert_eq!(h.state().sampled_color_preview.rgb, Some([0.0, 1.0, 0.0]));
+        assert_eq!(h.state().sampled_color_preview.key, None, "normal drag sampling works while the floating preview is disabled");
+
+        h.state_mut().run("prefs.set", json!({"path": "tools.showFloatingColorPreview", "value": true})).unwrap();
+        h.step();
+        assert_eq!(h.state().sampled_color_preview.rgb, Some([0.0, 1.0, 0.0]), "enabled preview samples the image on hover");
+        assert!(preview_area_visible(&h), "enabled preview draws a floating area");
+        assert_eq!(readouts([0.0, 1.0, 0.0]), ("#00ff00".into(), "0, 255, 0".into()));
 
         h.state_mut().ui.open_dialog(crate::state::DialogKind::Command, Default::default());
         h.step();
@@ -327,6 +345,11 @@ mod tests {
         h.state_mut().session.set_active(1);
         h.step();
         assert_eq!(h.state().sampled_color_preview.rgb, Some([0.0, 0.0, 1.0]), "switching documents refreshes the hover overlay");
+
+        h.state_mut().run("prefs.set", json!({"path": "tools.showFloatingColorPreview", "value": false})).unwrap();
+        h.run_steps(2);
+        assert_eq!(h.state().sampled_color_preview.key, None, "disabling the option clears the temporary cache");
+        assert!(!preview_area_visible(&h), "disabling the option removes the floating area");
     }
 
     #[test]

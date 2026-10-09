@@ -15,6 +15,7 @@ fn defaults_match_photoshop() {
     assert_eq!(p.transparency_and_gamut.colors(), [[255, 255, 255], [204, 204, 204]]);
     assert_eq!(p.transparency_and_gamut.square(), Some(8.0));
     assert_eq!(p.cursors.painting, PaintingCursor::NormalTip);
+    assert!(!p.tools.show_floating_color_preview);
     // Every dialog section is a key of the JSON form.
     let v = p.to_json();
     for (id, _) in SECTIONS {
@@ -185,6 +186,26 @@ fn json_round_trip_tolerates_unknown_and_missing_keys() {
     assert!(u.prefs().general.beep_when_done);
     assert_eq!(u.prefs().performance.history_states, 50);
     assert!(u.load_prefs_json("not json").is_err());
+}
+
+#[test]
+fn floating_color_preview_preference_defaults_off_and_persists() {
+    let mut s = Session::new();
+    assert_eq!(s.execute("prefs.get", json!({"path": "tools.showFloatingColorPreview"})).unwrap(), json!(false));
+    s.execute("prefs.set", json!({"path": "tools.showFloatingColorPreview", "value": true})).unwrap();
+    assert!(s.prefs().tools.show_floating_color_preview);
+
+    let saved = s.prefs_to_json();
+    assert_eq!(serde_json::from_str::<Value>(&saved).unwrap()["tools"]["showFloatingColorPreview"], json!(true));
+    let mut restored = Session::new();
+    restored.load_prefs_json(&saved).unwrap();
+    assert!(restored.prefs().tools.show_floating_color_preview);
+
+    // Preferences written before this option existed inherit Tools::default for the new field.
+    let mut older = Session::new();
+    older.load_prefs_json(r#"{"tools":{"showTooltips":false}}"#).unwrap();
+    assert!(!older.prefs().tools.show_tooltips);
+    assert!(!older.prefs().tools.show_floating_color_preview);
 }
 
 #[test]

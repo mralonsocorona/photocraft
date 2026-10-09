@@ -2961,7 +2961,8 @@ pub fn canvas_view(app: &mut PhotocraftApp, ui: &mut egui::Ui, idx: usize, rect:
     if primary {
         app.perf.span("scrollbars", crate::gpu_canvas::now_ms() - t0);
         app.hover_doc = response.hover_pos().map(|p| xf.to_doc(p));
-        let hover = if !crate::sampled_color_preview::blocks_canvas_hover(app)
+        let hover = if app.session.prefs().tools.show_floating_color_preview
+            && !crate::sampled_color_preview::blocks_canvas_hover(app)
             && !egui::Popup::is_any_open(&ctx)
             && !ctx.input(|i| i.pointer.primary_down())
             && tool == Tool::Eyedropper

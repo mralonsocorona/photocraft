@@ -412,6 +412,15 @@ mod tests {
         assert_eq!(tr(zh, "no such label"), "no such label");
     }
 
+    #[test]
+    fn color_preview_readouts_are_translated_in_supported_complete_catalogs() {
+        for lang in Lang::all().filter(|lang| lang.complete_menus()) {
+            for source in ["HEX:", "RGB:"] {
+                assert!(has(lang, source), "{}: missing sampled-color readout label {source}", lang.code());
+            }
+        }
+    }
+
     /// Keep the Korean tool/menu vocabulary aligned with the Photoshop equivalents.
     /// Sources and the product-specific vocabulary policy are recorded in `ko.tsv`.
     #[test]
