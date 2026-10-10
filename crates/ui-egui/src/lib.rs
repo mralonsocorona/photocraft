@@ -120,8 +120,8 @@ pub mod retouch_ui;
 mod rgb_histogram;
 pub mod rotate_view;
 pub mod rulers;
-pub mod screen_picker;
 mod sampled_color_preview;
+pub mod screen_picker;
 pub mod scrollbars;
 pub mod served_fonts;
 pub mod shortcut_dispatch;
@@ -583,6 +583,7 @@ impl PhotocraftApp {
             type_transform_preview: None,
             guide_drag: None,
             crop: Default::default(),
+            sampled_color_preview: sampled_color_preview::Preview::default(),
             hover_doc: None,
             clone_preview: None,
             info_sample: None,

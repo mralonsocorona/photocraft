@@ -287,7 +287,7 @@ mod tests {
 
         let mut app = app();
         app.ui.tool = Tool::Eyedropper;
-        app.ui.views = vec![View { zoom: 1.0, center: [20.0, 10.0], fit_pending: false, doc_size: [40, 20] }];
+        app.ui.views = vec![View { zoom: 1.0, center: [20.0, 10.0], fit_pending: false, fill_pending: false, rotation: 0.0, doc_size: [40, 20] }];
         let mut h = Harness::builder().with_size(vec2(600.0, 400.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 let Some(index) = app.session.active_index() else { return };
@@ -337,7 +337,7 @@ mod tests {
 
         h.state_mut().ui.tool = Tool::Eyedropper;
         h.state_mut().run("file.new", json!({"width": 40, "height": 20, "background": "#0000ff"})).unwrap();
-        let view = View { zoom: 1.0, center: [20.0, 10.0], fit_pending: false, doc_size: [40, 20] };
+        let view = View { zoom: 1.0, center: [20.0, 10.0], fit_pending: false, fill_pending: false, rotation: 0.0, doc_size: [40, 20] };
         h.state_mut().ui.views = vec![view.clone(), view];
         h.state_mut().session.set_active(0);
         h.step();
